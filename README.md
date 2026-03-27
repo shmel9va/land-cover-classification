@@ -115,7 +115,7 @@ docker build -t land-cover-pipeline .
 docker run --rm `
   -v "${PWD}\results:/app/results" `
   -v "${PWD}\models:/app/models" `
-  land-cover-pipeline python pipeline.py --epochs 50 --patience 5 --min_delta 0.0
+  land-cover-pipeline python pipeline.py --epochs 50 --patience 5 --min_delta 0.001
 ```
 
 ### Local run
