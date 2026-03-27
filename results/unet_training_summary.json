@@ -1,0 +1,1 @@
+{"best_epoch": 20, "best_val_loss": 0.1178759266509686, "best_val_acc": 95.87654320987654, "stopped_early": true, "patience": 5, "min_delta": 0.0}
