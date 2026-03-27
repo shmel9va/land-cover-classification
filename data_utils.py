@@ -21,9 +21,9 @@ def get_data_stats(root_dir):
     print("--------------------------\n")
     return dataset.classes
 
-def prepare_data(root_dir, batch_size=32, split_ratio=0.8):
+def prepare_data(root_dir, batch_size=32, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
     """
-    Prepares train and test DataLoaders.
+    Prepares train/val/test DataLoaders.
     """
     # Standard transforms for EuroSAT (64x64 images)
     # We use ImageNet normalization as a starting point, 
@@ -36,27 +36,36 @@ def prepare_data(root_dir, batch_size=32, split_ratio=0.8):
 
     full_dataset = datasets.ImageFolder(root=root_dir, transform=transform)
     
-    # Split into train and test
-    train_size = int(split_ratio * len(full_dataset))
-    test_size = len(full_dataset) - train_size
+    if train_ratio <= 0 or val_ratio <= 0 or test_ratio <= 0:
+        raise ValueError("train_ratio/val_ratio/test_ratio must be > 0")
+    ratio_sum = train_ratio + val_ratio + test_ratio
+    if abs(ratio_sum - 1.0) > 1e-6:
+        raise ValueError(f"train_ratio + val_ratio + test_ratio must equal 1.0 (got {ratio_sum})")
+
+    n = len(full_dataset)
+    train_size = int(train_ratio * n)
+    val_size = int(val_ratio * n)
+    test_size = n - train_size - val_size
     
-    train_dataset, test_dataset = random_split(
-        full_dataset, [train_size, test_size], 
+    train_dataset, val_dataset, test_dataset = random_split(
+        full_dataset, [train_size, val_size, test_size],
         generator=torch.Generator().manual_seed(42)
     )
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     print(f"Train samples: {len(train_dataset)}")
+    print(f"Val samples:   {len(val_dataset)}")
     print(f"Test samples:  {len(test_dataset)}")
     
-    return train_loader, test_loader, full_dataset.classes
+    return train_loader, val_loader, test_loader, full_dataset.classes
 
 if __name__ == "__main__":
     data_path = "EuroSAT/2750"
     if os.path.exists(data_path):
         classes = get_data_stats(data_path)
-        train_loader, test_loader, _ = prepare_data(data_path)
+        train_loader, val_loader, test_loader, _ = prepare_data(data_path)
     else:
         print(f"Error: Path {data_path} not found.")

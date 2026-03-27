@@ -74,11 +74,12 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, default='cnn', choices=['cnn', 'unet'], help='Model type: cnn or unet')
     parser.add_argument('--data_dir', type=str, default='EuroSAT/2750', help='Path to dataset')
     parser.add_argument('--model_path', type=str, help='Path to model weights')
+    parser.add_argument('--batch_size', type=int, default=32, help='Batch size for evaluation')
     
     args = parser.parse_args()
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    _, test_loader, classes = prepare_data(args.data_dir, batch_size=32)
+    _, _, test_loader, classes = prepare_data(args.data_dir, batch_size=args.batch_size)
     num_classes = len(classes)
     
     if args.model == 'cnn':

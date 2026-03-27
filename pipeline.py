@@ -13,9 +13,11 @@ def run_command(command):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Land Cover Classification Pipeline')
-    parser.add_argument('--epochs', type=int, default=5, help='Number of epochs for training')
+    parser.add_argument('--epochs', type=int, default=50, help='Max number of epochs for training (early stopping may stop earlier)')
     parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
     parser.add_argument('--skip_train', action='store_true', help='Skip training and only evaluate')
+    parser.add_argument('--patience', type=int, default=5, help='Early stopping patience')
+    parser.add_argument('--min_delta', type=float, default=0.0, help='Minimum val_loss improvement to reset patience')
     
     args = parser.parse_args()
     
@@ -30,7 +32,10 @@ if __name__ == "__main__":
             print(f"\n{'='*50}")
             print(f"TRAINING MODEL: {model.upper()}")
             print(f"{'='*50}")
-            train_cmd = f'"{python_exe}" train.py --model {model} --epochs {args.epochs} --batch_size {args.batch_size}'
+            train_cmd = (
+                f'"{python_exe}" train.py --model {model} --epochs {args.epochs} --batch_size {args.batch_size} '
+                f'--patience {args.patience} --min_delta {args.min_delta}'
+            )
             if not run_command(train_cmd):
                 break
                 
