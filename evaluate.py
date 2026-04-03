@@ -1,3 +1,9 @@
+"""
+Offline evaluation on the held-out test split from prepare_data.
+
+Loads trained weights (or runs an uninitialized model if missing), computes
+sklearn metrics, saves JSON reports, and writes a confusion matrix heatmap PNG.
+"""
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,46 +15,62 @@ import argparse
 import os
 import json
 
+
 def evaluate(model, test_loader, device, classes, model_name='model'):
+    """
+    Run inference on the full test_loader and aggregate classification metrics.
+
+    Uses weighted averaging for F1/precision/recall to account for class imbalance.
+    Persists: scalar metrics JSON, per-class report JSON, confusion matrix PNG.
+
+    Args:
+        model: Trained or random model (same architecture as training).
+        test_loader: Batches of (images, labels); typically shuffle=False.
+        device: torch.device for tensors.
+        classes: List of class names (order matches label indices).
+        model_name: Prefix for output files under results/.
+
+    Returns:
+        dict with keys accuracy, f1, precision, recall (floats).
+    """
     model.to(device)
     model.eval()
-    
+
     y_true = []
     y_pred = []
-    
+
     with torch.no_grad():
         for images, labels in test_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
-            
+
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(predicted.cpu().numpy())
-            
+
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-    
-    # Calculate metrics
+
+    # sklearn metrics: 'weighted' averages per-class scores by support
     accuracy = accuracy_score(y_true, y_pred)
     f1 = f1_score(y_true, y_pred, average='weighted')
     precision = precision_score(y_true, y_pred, average='weighted')
     recall = recall_score(y_true, y_pred, average='weighted')
-    
+
     metrics = {
         'accuracy': accuracy,
         'f1': f1,
         'precision': precision,
         'recall': recall
     }
-    
+
     print(f"\n--- Metrics for {model_name} ---")
     print(f"Accuracy: {accuracy:.4f}")
     print(f"F1 Score: {f1:.4f}")
     print(f"Precision: {precision:.4f}")
     print(f"Recall: {recall:.4f}")
     print("---------------------------------\n")
-    
-    # Confusion matrix
+
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', xticklabels=classes, yticklabels=classes, cmap='Blues')
@@ -57,17 +79,17 @@ def evaluate(model, test_loader, device, classes, model_name='model'):
     plt.title(f'Confusion Matrix - {model_name}')
     plt.savefig(f'results/{model_name}_cm.png')
     plt.close()
-    
-    # Classification report
+
     report = classification_report(y_true, y_pred, target_names=classes, output_dict=True)
-    
+
     with open(f'results/{model_name}_metrics.json', 'w') as f:
         json.dump(metrics, f)
-        
+
     with open(f'results/{model_name}_report.json', 'w') as f:
         json.dump(report, f)
-        
+
     return metrics
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Evaluate Land Cover Classification Models')
@@ -75,24 +97,25 @@ if __name__ == "__main__":
     parser.add_argument('--data_dir', type=str, default='EuroSAT/2750', help='Path to dataset')
     parser.add_argument('--model_path', type=str, help='Path to model weights')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size for evaluation')
-    
+
     args = parser.parse_args()
-    
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Same prepare_data call as training: same seed 42 => same test subset
     _, _, test_loader, classes = prepare_data(args.data_dir, batch_size=args.batch_size)
     num_classes = len(classes)
-    
+
     if args.model == 'cnn':
         model = SimpleCNN(num_classes=num_classes)
     else:
         model = UNetClassifier(num_classes=num_classes)
-        
+
     model_path = args.model_path if args.model_path else f'models/best_{args.model}.pth'
     if os.path.exists(model_path):
         model.load_state_dict(torch.load(model_path, map_location=device))
         print(f"Loaded weights from {model_path}")
     else:
         print(f"Warning: Model weights not found at {model_path}. Evaluating untrained model.")
-        
+
     os.makedirs('results', exist_ok=True)
     evaluate(model, test_loader, device, classes, model_name=args.model)
